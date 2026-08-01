@@ -85,6 +85,20 @@ def redetect(a: Analysis, params: Params) -> Analysis:
     a.cuts, a.keeps = cuts, keeps
     return a
 
+def apply_ranges(a: Analysis, ranges: list[tuple[float, float, str]]) -> Analysis:
+    """Add hand-specified spans to the cut list.
+
+    These bypass the detectors entirely — the user named a span of time, so it
+    goes. Merging afterwards means a manual cut adjacent to a detected one
+    fuses into a single clean removal instead of leaving a sliver between them.
+    """
+    from .detect import Cut, merge
+    for s, e, label in ranges:
+        a.cuts.append(Cut(s, e, "manual", label))
+    a.cuts = merge(a.cuts, a.words)
+    a.keeps = to_keeps(a.cuts, a.duration, a.rms, a.floor)
+    return a
+
 
 def rekeep(a: Analysis, disabled: set[int]) -> list[tuple[float, float]]:
     """Recompute keeps with some cuts switched off, for the editor surface."""
