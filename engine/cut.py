@@ -24,10 +24,14 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from .ff import ffmpeg_bin
+
 FADE = 0.008  # seconds — long enough to kill the click, short enough to be inaudible
 
 
 def _run(cmd: list[str]) -> None:
+    if cmd and cmd[0] == "ffmpeg":
+        cmd = [ffmpeg_bin()] + cmd[1:]
     proc = subprocess.run(cmd, capture_output=True)
     if proc.returncode != 0:
         tail = proc.stderr.decode(errors="ignore").strip().splitlines()[-6:]

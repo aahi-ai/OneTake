@@ -33,6 +33,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from engine import analyze as run_analyze, rekeep, redetect, parse_feedback
 from engine.cut import render, write_edl
+from engine.ff import ffmpeg_bin
 
 ROOT = Path(__file__).resolve().parent.parent
 WORK = ROOT / "work"
@@ -70,7 +71,7 @@ def normalise(src: Path) -> Path:
         return src
     out = src.with_name("normalised.mp4")
     proc = subprocess.run(
-        ["ffmpeg", "-y", "-nostdin", "-fflags", "+genpts", "-i", str(src),
+        [ffmpeg_bin(), "-y", "-nostdin", "-fflags", "+genpts", "-i", str(src),
          "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
          "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
          "-movflags", "+faststart", str(out)],

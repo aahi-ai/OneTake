@@ -16,11 +16,12 @@ energy track around and snap cut points to the nearest quiet frame.
 from __future__ import annotations
 
 import subprocess
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+
+from .ff import ffmpeg_bin
 
 SAMPLE_RATE = 16_000
 FRAME_MS = 10
@@ -41,13 +42,7 @@ class Word:
 
 
 def _require_ffmpeg() -> None:
-    if shutil.which("ffmpeg") is None:
-        raise RuntimeError(
-            "ffmpeg not found on PATH. Install it first:\n"
-            "  macOS:   brew install ffmpeg\n"
-            "  Ubuntu:  sudo apt install ffmpeg\n"
-            "  Windows: winget install Gyan.FFmpeg"
-        )
+    ffmpeg_bin()          # raises with install instructions if nothing is found
 
 
 def load_audio(video_path: str | Path) -> np.ndarray:
@@ -59,7 +54,7 @@ def load_audio(video_path: str | Path) -> np.ndarray:
     _require_ffmpeg()
     proc = subprocess.run(
         [
-            "ffmpeg", "-nostdin", "-threads", "0",
+            ffmpeg_bin(), "-nostdin", "-threads", "0",
             "-i", str(video_path),
             "-f", "s16le", "-ac", "1", "-acodec", "pcm_s16le",
             "-ar", str(SAMPLE_RATE), "-",
@@ -113,8 +108,25 @@ def snap_to_silence(t: float, rms: np.ndarray, floor: float,
     return t
 
 
+# Whisper is trained on tidy written transcripts, so by default it quietly
+# deletes disfluencies — you get "I built this" from audio that actually says
+# "I, um, built this". The filler detector can't remove a word that was never
+# transcribed.
+#
+# Priming with a deliberately messy prompt biases it toward writing them down.
+# Whisper conditions on this text as if it were the preceding sentence, so a
+# prompt full of "um" makes the model expect more of the same. Combined with
+# suppress_tokens=[], which turns off the built-in filtering of those tokens,
+# fillers start showing up in the output where they belong.
+DISFLUENT_PROMPT = (
+    "Umm, so, like— hmm, let me think. Uh, okay, so basically, you know, "
+    "it's, uh, it's kind of like that. I mean, um, yeah."
+)
+
+
 def transcribe(video_path: str | Path, model_size: str = "base.en",
-               device: str = "auto", progress=None) -> tuple[list[Word], np.ndarray, float]:
+               device: str = "auto", progress=None,
+               keep_disfluencies: bool = True) -> tuple[list[Word], np.ndarray, float]:
     """Run ASR and return (words, rms envelope, duration seconds).
 
     model_size: tiny.en is ~2x faster and noticeably sloppier on word edges.
@@ -138,6 +150,8 @@ def transcribe(video_path: str | Path, model_size: str = "base.en",
         word_timestamps=True,
         vad_filter=False,          # we do our own pause analysis; VAD would hide it
         condition_on_previous_text=False,  # stops repeated-phrase hallucination loops
+        initial_prompt=DISFLUENT_PROMPT if keep_disfluencies else None,
+        suppress_tokens=[] if keep_disfluencies else [-1],
         beam_size=5,
     )
 

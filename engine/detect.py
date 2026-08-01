@@ -57,6 +57,7 @@ class Params:
     stutter: bool = True
     dead_air: bool = True
     retake: bool = True
+    soft_filler: bool = False    # also cut like/so/basically even mid-sentence
 
 
 @dataclass
@@ -110,7 +111,7 @@ def find_dead_air(words: list[Word], duration: float,
 
 
 # ── 2. filler ───────────────────────────────────────────────────────────────
-def find_fillers(words: list[Word]) -> list[Cut]:
+def find_fillers(words: list[Word], soft: bool = False) -> list[Cut]:
     cuts: list[Cut] = []
     for i, w in enumerate(words):
         c = w.clean
@@ -119,8 +120,13 @@ def find_fillers(words: list[Word]) -> list[Cut]:
         if c in FILLERS:
             cuts.append(Cut(w.start, w.end, "filler", w.text))
             continue
-        # soft fillers only count when isolated by pauses on both sides
+        # Soft fillers normally only count when isolated by pauses on both
+        # sides, so "I like it" survives. Aggressive mode drops that guard —
+        # useful when someone says "like" forty times, risky otherwise.
         if c in SOFT_FILLERS:
+            if soft:
+                cuts.append(Cut(w.start, w.end, "filler", w.text))
+                continue
             before = w.start - words[i - 1].end if i > 0 else 9.0
             after = words[i + 1].start - w.end if i < len(words) - 1 else 9.0
             if before > 0.25 and after > 0.25:
@@ -289,7 +295,7 @@ def analyze(words: list[Word], duration: float, rms: np.ndarray, floor: float,
     if p.stutter:
         cuts += find_stutters(words)
     if p.filler:
-        cuts += find_fillers(words)
+        cuts += find_fillers(words, p.soft_filler)
     if p.dead_air:
         cuts += find_dead_air(words, duration, p.min_pause, p.breath)
 

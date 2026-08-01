@@ -21,7 +21,7 @@ from .detect import Params
 
 # (pattern, human explanation, mutation)
 RULES: list[tuple[str, str, dict]] = [
-    # keep specific categories
+    # turn categories OFF
     (r"\b(keep|leave|don'?t (cut|remove)|stop cutting|restore)\b.{0,24}\b(um+s?|uh+s?|filler)",
      "keeping filler words", {"filler": False}),
     (r"\b(keep|leave|don'?t (cut|remove)|stop cutting|restore)\b.{0,24}\b(pause|silence|gap|dead ?air|breath)",
@@ -30,6 +30,18 @@ RULES: list[tuple[str, str, dict]] = [
      "keeping every take", {"retake": False}),
     (r"\b(keep|leave|don'?t (cut|remove)|stop cutting|restore)\b.{0,24}\b(stutter|stammer|repeat word)",
      "keeping stutters", {"stutter": False}),
+
+    # turn categories ON, harder. "remove all the ums" means the default pass
+    # missed some, so switch on aggressive mode rather than just re-enabling.
+    (r"\b(remove|cut|kill|get rid of|delete|take out)\b.{0,24}\b(um+s?|uh+s?|filler)",
+     "cutting every filler, including the borderline ones",
+     {"filler": True, "soft_filler": True}),
+    (r"\b(remove|cut|kill|get rid of|delete|take out)\b.{0,24}\b(pause|silence|gap|dead ?air)",
+     "cutting the pauses harder", {"dead_air": True, "min_pause": 0.38}),
+    (r"\b(remove|cut|kill|get rid of|delete|take out)\b.{0,24}\b(retake|repeat|extra take)",
+     "cutting retakes more eagerly", {"retake": True, "retake_sim": 0.62}),
+    (r"\b(remove|cut|kill|get rid of|delete|take out)\b.{0,24}\b(stutter|stammer)",
+     "cutting stutters", {"stutter": True}),
 
     # pacing
     (r"\b(too (fast|rushed|choppy|abrupt|tight)|rushed|choppy|no room|can'?t breathe|breathing room|slow(er)? (it )?down|less aggressive|too much)\b",
@@ -45,7 +57,8 @@ RULES: list[tuple[str, str, dict]] = [
 
     # blunt instruments
     (r"\b(cut everything|maximum|be ruthless|as short as possible)\b",
-     "cutting as hard as it can", {"breath": 0.10, "min_pause": 0.30, "retake_sim": 0.58}),
+     "cutting as hard as it can",
+     {"breath": 0.10, "min_pause": 0.30, "retake_sim": 0.58, "soft_filler": True}),
     (r"\b(barely|minimal|light touch|only the ums|just fillers?)\b",
      "only removing filler words", {"dead_air": False, "retake": False, "stutter": False}),
 ]
