@@ -1,20 +1,3 @@
-"""
-OneTake API.
-
-    POST /api/analyze          upload a file, start a job
-    GET  /api/jobs/{id}        poll progress, then read the cut list
-    POST /api/render/{id}      render with some cuts toggled off
-    GET  /api/source/{id}      original file, for the editor's timeline preview
-    GET  /api/result/{id}      the finished cut
-    GET  /api/edl/{id}         CMX3600 edit list
-
-Analyze and render are separate endpoints on purpose. Transcription dominates
-the runtime, so the editor toggles cuts and re-renders without paying for ASR
-again — a re-render is a few seconds instead of a minute.
-
-    uvicorn server.main:app --reload --port 8000
-"""
-
 from __future__ import annotations
 
 import shutil
@@ -133,18 +116,7 @@ async def analyze_endpoint(
 @app.websocket("/ws/record/{job_id}")
 async def record_socket(ws: WebSocket, job_id: str, ext: str = "webm",
                         model: str = "base.en"):
-    """Stream a recording to disk while it is still being recorded.
-
-    Borrowed from ViniClip's approach, simplified to one socket. Uploading a
-    finished blob means the user watches a progress bar for a file that already
-    exists on their own machine; streaming chunks as MediaRecorder emits them
-    means the file is complete the instant they hit stop, and only analysis
-    remains.
-
-    A single muxed stream rather than separate video and audio sockets: two
-    streams have to be re-synced on the server, and drift there is much worse
-    than the small amount of latency this costs.
-    """
+   
     await ws.accept()
     d = WORK / job_id
     d.mkdir(parents=True, exist_ok=True)
