@@ -232,11 +232,13 @@ async def feedback_endpoint(job_id: str, text: str = Form(...)):
     if a is None:
         raise HTTPException(409, "That job hasn't finished analysing yet.")
 
-    params, notes, ranges = parse_feedback(text, j.get("params"), a.duration)
+    params, notes, ranges = parse_feedback(text, j.get("params"), a.duration, a.words)
     if not notes:
         return {"ok": False, "notes": [],
                 "message": "I didn't catch a change in that. Try things like "
-                           "\"keep the ums\", \"it feels rushed\", or \"cut it tighter\"."}
+                           "\"keep the ums\", \"it feels rushed\", "
+                           "\"remove the last 2 seconds\", or "
+                           "\"remove the part about bananas\"."}
 
     a = redetect(a, params)
     if ranges:

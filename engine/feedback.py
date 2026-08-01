@@ -1,15 +1,20 @@
 """
 Turn a sentence of feedback into edits.
 
-Two kinds of instruction arrive here and they work completely differently:
+Three kinds of instruction arrive here and they work completely differently:
 
   tuning   "keep the ums", "it feels rushed", "cut it tighter"
            These adjust detector thresholds. Every knob that matters is already
            a number in Params, so intent maps straight onto those numbers.
 
   surgery  "remove the last 2 seconds", "cut from 0:12 to 0:19"
-           These name a span of time directly. No detector is involved — the
-           range just gets added to the cut list.
+           These name a span of time directly. No detector involved — the range
+           just gets added to the cut list.
+
+  topic    "remove the part about bananas"
+           These name content. The transcript already has word-level timings,
+           so finding the sentence that talks about a thing is a search, not a
+           model call.
 
 ViniClip sends feedback to an LLM and re-edits from the response. More
 flexible, but it needs an API key, adds seconds of latency, and can return
@@ -17,7 +22,7 @@ something unusable mid-demo. Matching intent directly is instant, offline, and
 cannot fail in a way that leaves you with no video.
 
 Re-detection costs milliseconds because the transcript is already cached, so
-either kind of change feels like an undo rather than a second render.
+any of these feels like an undo rather than a second render.
 """
 
 from __future__ import annotations
@@ -133,7 +138,77 @@ def find_ranges(text: str, duration: float) -> list[tuple[float, float, str]]:
     return uniq
 
 
-def parse(text: str, base: Params | None = None, duration: float = 0.0):
+# ── topic matching ──────────────────────────────────────────────────────────
+# Words too common to identify a topic. "remove the part about the thing I said"
+# should match nothing rather than matching everywhere.
+STOP = {
+    "the", "a", "an", "part", "bit", "section", "sentence", "line", "thing",
+    "where", "when", "that", "which", "i", "said", "say", "saying", "says",
+    "about", "with", "of", "on", "in", "to", "and", "my", "me", "it", "was",
+    "is", "talking", "talk", "mention", "mentioned", "mentioning", "stuff",
+}
+
+TOPIC_RE = re.compile(
+    rf"{CLIP}\s+(?:the\s+)?(?:part|bit|section|sentence|line|clip|chunk)?\s*"
+    r"(?:about|where|when|that|with|mentioning|regarding|on)\s+(.{3,60}?)\s*$"
+)
+
+
+def find_topics(text: str) -> list[str]:
+    """Pull the subject out of 'remove the part about bananas'."""
+    out = []
+    for m in TOPIC_RE.finditer(text.strip()):
+        phrase = m.group(1).strip(" .,!?\"'")
+        if phrase:
+            out.append(phrase)
+    return out
+
+
+def _keywords(phrase: str) -> list[str]:
+    return [w for w in re.findall(r"[a-z']+", phrase.lower())
+            if w not in STOP and len(w) > 2]
+
+
+def _matches(word: str, key: str) -> bool:
+    """Loose match so 'bananas' in the transcript answers a request about
+    'banana'. Comparing the first few characters handles plurals and simple
+    inflections without dragging in a stemmer."""
+    a, b = word.lower().strip(".,!?;:\"'"), key.lower()
+    n = min(len(a), len(b), 5)
+    return n >= 3 and a[:n] == b[:n]
+
+
+def topic_ranges(words, phrases: list[str]) -> list[tuple[float, float, str]]:
+    """Find whole sentences that talk about a phrase, and return their spans.
+
+    Sentence-level, not word-level, on purpose: cutting the single word
+    "bananas" out of "I really like bananas" leaves "I really like" dangling,
+    which is worse than leaving it alone. The unit a person means when they say
+    "the part about X" is the sentence, so that's the unit that goes.
+    """
+    from .detect import split_attempts
+
+    if not words or not phrases:
+        return []
+
+    attempts = split_attempts(words)
+    out = []
+    for phrase in phrases:
+        keys = _keywords(phrase)
+        if not keys:
+            continue
+        for a in attempts:
+            hits = sum(1 for k in keys
+                       if any(_matches(w.text, k) for w in a.words))
+            # every keyword must appear for a multi-word phrase, so "the part
+            # about my dog" doesn't match a sentence that only says "my"
+            if hits == len(keys):
+                out.append((a.start, a.end, f'"{phrase}"'))
+                break
+    return out
+
+
+def parse(text: str, base: Params | None = None, duration: float = 0.0, words=None):
     """Return (params, notes, ranges).
 
     notes get shown back to the user — silently altering the edit and saying
@@ -146,6 +221,12 @@ def parse(text: str, base: Params | None = None, duration: float = 0.0):
     ranges = find_ranges(low, duration) if duration else []
     for _, _, label in ranges:
         notes.append(f"removing {label}")
+
+    if words:
+        found = topic_ranges(words, find_topics(low))
+        for s_, e_, label in found:
+            notes.append(f"removing the part about {label}")
+        ranges = ranges + found
 
     for pattern, note, change in RULES:
         if re.search(pattern, low):
