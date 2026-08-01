@@ -1,0 +1,5 @@
+work/
+__pycache__/
+*.pyc
+*_onetake.mp4
+.venv/
