@@ -31,7 +31,7 @@ from fastapi.staticfiles import StaticFiles
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from engine import analyze as run_analyze, rekeep, redetect, parse_feedback
+from engine import analyze as run_analyze, rekeep, redetect, apply_ranges, parse_feedback
 from engine.cut import render, write_edl
 from engine.ff import ffmpeg_bin
 
@@ -232,13 +232,15 @@ async def feedback_endpoint(job_id: str, text: str = Form(...)):
     if a is None:
         raise HTTPException(409, "That job hasn't finished analysing yet.")
 
-    params, notes = parse_feedback(text, j.get("params"))
+    params, notes, ranges = parse_feedback(text, j.get("params"), a.duration)
     if not notes:
         return {"ok": False, "notes": [],
                 "message": "I didn't catch a change in that. Try things like "
                            "\"keep the ums\", \"it feels rushed\", or \"cut it tighter\"."}
 
     a = redetect(a, params)
+    if ranges:
+        a = apply_ranges(a, ranges)
     out = Path(j["src"]).with_name("cut.mp4")
     _set(job_id, stage="rendering", progress=0.5, params=params)
     try:

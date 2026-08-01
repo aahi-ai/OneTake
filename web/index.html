@@ -6,15 +6,14 @@
 <title>onetake</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Martian+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header id="bar">
-  <div class="mark"><span class="mark-n">onetake</span><span class="mark-v">v0.1</span></div>
-  <span class="mark-say">your first take is the final take</span>
-  <nav id="nav">
+<header>
+  <span class="mark">onetake</span>
+  <nav>
     <button class="nv on" data-go="rec">record</button>
     <button class="nv" data-go="up">upload</button>
   </nav>
@@ -22,22 +21,20 @@
 
 <main>
 
-  <!-- 1 · record -->
+  <!-- record -->
   <section class="pg on" id="pg-rec">
     <div class="frame">
       <video id="preview" autoplay muted playsinline></video>
       <div class="tag"><i id="dot"></i><span class="num" id="rt">0:00</span></div>
-      <div class="tag r num" id="sent"></div>
-      <div class="frame-idle" id="frame-idle">camera off</div>
+      <div class="idle" id="idle">camera off</div>
     </div>
-    <div class="ctl">
-      <button class="go" id="go">start recording</button>
-      <button class="btn" id="stop" disabled>stop &amp; cut</button>
-      <span class="say" id="say">flub a line? just say it again — i keep the last attempt.</span>
+    <div class="row">
+      <button class="go" id="btn">start recording</button>
+      <span class="hint" id="hint">flub a line? say it again — only the last one survives</span>
     </div>
   </section>
 
-  <!-- 2 · upload -->
+  <!-- upload -->
   <section class="pg" id="pg-up">
     <button id="zone">
       <span class="zone-a">↓</span>
@@ -45,80 +42,35 @@
       <span class="zone-c">mp4 · mov · webm · wav · mp3</span>
     </button>
     <input type="file" id="file" accept="video/*,audio/*" hidden>
-    <div class="opts">
-      <label class="sw"><input type="checkbox" id="o-retake" checked><i></i><span>retakes</span></label>
-      <label class="sw"><input type="checkbox" id="o-stutter" checked><i></i><span>stutters</span></label>
-      <label class="sw"><input type="checkbox" id="o-filler" checked><i></i><span>fillers</span></label>
-      <label class="sw"><input type="checkbox" id="o-dead" checked><i></i><span>dead air</span></label>
-      <select id="model">
-        <option value="tiny.en">tiny · fastest</option>
-        <option value="base.en" selected>base · balanced</option>
-        <option value="small.en">small · cleanest</option>
-      </select>
-    </div>
   </section>
 
-  <!-- 3 · working -->
+  <!-- working -->
   <section class="pg" id="pg-work">
     <div class="work">
       <div class="work-r"><span class="num" id="w-st">queued</span><span class="num" id="w-pc">0%</span></div>
       <div class="work-t"><div id="w-fl"></div></div>
-      <p class="say">first run pulls the whisper weights, then it's cached.</p>
     </div>
   </section>
 
-  <!-- 4 · result -->
+  <!-- result -->
   <section class="pg" id="pg-out">
-    <div class="cols">
+    <video id="out" controls playsinline></video>
+    <div class="reel" id="reel"></div>
+    <div class="stat num" id="stat">—</div>
 
-      <div>
-        <video id="out" controls playsinline></video>
-        <div class="reel" id="reel"></div>
-        <div class="key">
-          <span><i class="c retake"></i>retake</span>
-          <span><i class="c stutter"></i>stutter</span>
-          <span><i class="c filler"></i>filler</span>
-          <span><i class="c dead_air"></i>dead air</span>
-        </div>
-      </div>
-
-      <div class="side">
-        <div class="tally">
-          <div class="t"><b class="num" id="f-in">—</b><span>in</span></div>
-          <div class="t"><b class="num keep" id="f-out">—</b><span>out</span></div>
-          <div class="t"><b class="num cut" id="f-gone">—</b><span>gone</span></div>
-          <div class="t"><b class="num" id="f-n">—</b><span>cuts</span></div>
-        </div>
-
-        <div class="ask">
-          <div class="ask-t">request changes</div>
-          <textarea id="fb" rows="3" placeholder="keep the ums&#10;it feels rushed&#10;cut it tighter"></textarea>
-          <div class="ask-row">
-            <button class="go" id="apply">apply</button>
-            <a class="btn" id="dl" download>download</a>
-            <a class="btn q" id="edl">.edl</a>
-          </div>
-          <div class="ask-out" id="fb-out"></div>
-        </div>
-
-        <div class="scr-box">
-          <div class="scr-t"><span>transcript</span><span class="say">struck = cut</span></div>
-          <div id="script"></div>
-        </div>
-      </div>
-
+    <div class="ask">
+      <input id="fb" type="text" placeholder="request a change — try “keep the ums” or “remove the last 2 seconds”">
+      <button class="go" id="apply">apply</button>
+      <a class="btn" id="dl" download>download</a>
     </div>
-    <button class="btn q again" id="again">← new take</button>
+    <div class="note" id="note"></div>
+
+    <button class="link" id="again">start over</button>
   </section>
 
 </main>
 
-<footer id="foot">
-  <span id="msg">ready</span>
-  <span class="sp"></span>
-  <span class="num" id="f-job">—</span>
-  <span class="num">local · nothing uploads</span>
-</footer>
+<footer><span id="msg">ready</span></footer>
 
 <script src="app.js"></script>
 </body>

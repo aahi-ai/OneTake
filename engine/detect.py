@@ -235,7 +235,7 @@ def merge(cuts: list[Cut], words: list[Word] | None = None) -> list[Cut]:
     """
     if not cuts:
         return []
-    rank = {"retake": 3, "stutter": 2, "filler": 1, "dead_air": 0}
+    rank = {"manual": 4, "retake": 3, "stutter": 2, "filler": 1, "dead_air": 0}    
     ordered = sorted(cuts, key=lambda c: c.start)
     out = [ordered[0]]
 
